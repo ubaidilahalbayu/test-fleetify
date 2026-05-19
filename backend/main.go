@@ -3,8 +3,9 @@ package main
 import (
 	"log"
 
-    "fleetify-backend/config"
-    "fleetify-backend/models"
+	"fleetify-backend/config"
+	"fleetify-backend/models"
+	"fleetify-backend/seeders"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -19,6 +20,8 @@ func main() {
 		&models.MaintenanceReport{},
 		&models.ReportItem{},
 	)
+
+	seeders.RunSeeder()
 
 	app := fiber.New()
 

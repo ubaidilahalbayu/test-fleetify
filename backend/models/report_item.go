@@ -2,10 +2,11 @@ package models
 
 type ReportItem struct {
 	ID            uint `gorm:"primaryKey"`
-	ReportID      uint
-	ItemID        uint
+	ReportID      uint `gorm:"not null"`
+	ItemID        uint `gorm:"not null"`
 	Quantity      int
 	PriceSnapshot float64
 
-	Item MasterItem `gorm:"foreignKey:ItemID"`
+	Item   MasterItem       `gorm:"foreignKey:ItemID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+	Report MaintenanceReport `gorm:"foreignKey:ReportID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }
