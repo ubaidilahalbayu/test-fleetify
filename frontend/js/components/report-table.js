@@ -162,7 +162,7 @@ function ReportTableComponent(reports) {
 
                 modal.appendChild(preview);
 
-                let base64Photo = "";
+                let selectedPhoto = null;
 
                 photoInput.onchange = (e) => {
 
@@ -171,14 +171,13 @@ function ReportTableComponent(reports) {
                     if (!file) {
                         return;
                     }
+                    selectedPhoto = file;
 
                     const reader = new FileReader();
 
                     reader.onload = function(event) {
 
-                        base64Photo = event.target.result;
-
-                        preview.src = base64Photo;
+                        preview.src = event.target.result;
 
                         preview.classList.remove("d-none");
                     };
@@ -198,20 +197,20 @@ function ReportTableComponent(reports) {
 
                 submitBtn.onclick = async () => {
 
-                    if (!base64Photo) {
+                    if (!selectedPhoto) {
 
                         alert("Photo required");
 
                         return;
                     }
+                    const formData = new FormData();
 
+                    formData.append("proof_photo", selectedPhoto);
                     const response = await apiFetch(
                         `/reports/${report.ID}/complete`,
                         {
                             method: "PUT",
-                            body: JSON.stringify({
-                                proof_photo: base64Photo
-                            })
+                            body: formData
                         }
                     );
 
@@ -398,7 +397,7 @@ function openDetailModal(report) {
 
         const img = document.createElement("img");
 
-        img.src = report.InitialPhoto;
+        img.src = window.APP_CONFIG.API_BASE_URL + "/" + report.InitialPhoto;
 
         img.className = "img-fluid rounded mb-3";
 
@@ -416,7 +415,7 @@ function openDetailModal(report) {
 
         const proofImg = document.createElement("img");
 
-        proofImg.src = report.ProofPhoto;
+        proofImg.src = window.APP_CONFIG.API_BASE_URL + "/" + report.ProofPhoto;
 
         proofImg.className = "img-fluid rounded mb-3";
 

@@ -1,0 +1,13 @@
+.env
+backend/uploads/
+
+bin/
+dist/
+
+.DS_Store
+Thumbs.db
+
+.vscode/
+.idea/
+
+*.log

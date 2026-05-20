@@ -120,7 +120,7 @@ async function ReportFormComponent() {
 
     previewImage.style.maxHeight = "250px";
 
-    let base64Photo = "";
+    let selectedPhoto = null;
 
     photoInput.onchange = (e) => {
 
@@ -130,13 +130,13 @@ async function ReportFormComponent() {
             return;
         }
 
+        selectedPhoto = file;
+
         const reader = new FileReader();
 
         reader.onload = function(event) {
 
-            base64Photo = event.target.result;
-
-            previewImage.src = base64Photo;
+            previewImage.src = event.target.result;
 
             previewImage.classList.remove("d-none");
         };
@@ -197,22 +197,62 @@ async function ReportFormComponent() {
 
     submitBtn.onclick = async () => {
 
-        const payload = {
-            vehicle_id: Number(vehicleSelect.value),
-            odometer: Number(odometerInput.value),
-            complaint: complaintInput.value,
-            initial_photo: base64Photo,
-            items: getReportItems()
-        };
+        if (!selectedPhoto) {
 
-        const response = await apiFetch("/reports", {
-            method: "POST",
-            body: JSON.stringify(payload)
-        });
+            alert("Photo required");
 
-        alert(response.message);
+            return;
+        }
 
-        renderPage("history");
+        const items = getReportItems();
+
+        const formData = new FormData();
+
+        formData.append(
+            "vehicle_id",
+            vehicleSelect.value
+        );
+
+        formData.append(
+            "odometer",
+            odometerInput.value
+        );
+
+        formData.append(
+            "complaint",
+            complaintInput.value
+        );
+
+        formData.append(
+            "photo",
+            selectedPhoto
+        );
+
+        formData.append(
+            "items",
+            JSON.stringify(items)
+        );
+
+        try {
+
+            const response = await apiFetch(
+                "/reports",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+            alert(response.message);
+
+            renderPage("history");
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert("Failed create report");
+        }
     };
 
     const clearBtn = document.createElement("button");
@@ -233,7 +273,7 @@ async function ReportFormComponent() {
 
         previewImage.classList.add("d-none");
 
-        base64Photo = "";
+        selectedPhoto = null;
 
         itemContainer.replaceChildren();
 

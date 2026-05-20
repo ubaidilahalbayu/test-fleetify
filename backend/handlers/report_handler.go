@@ -5,69 +5,177 @@ import (
 	"fleetify-backend/models"
 	"fleetify-backend/services"
 
+	"encoding/json"
+	"fmt"
+	"os"
+	"strconv"
+	"time"
+	"log"
+
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
 )
 
 func CreateReport(c *fiber.Ctx) error {
 
-	var req models.CreateReportRequest
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"message": "Invalid request",
-		})
-	}
-
 	user := c.Locals("user").(models.User)
 
-	err := config.DB.Transaction(func(tx *gorm.DB) error {
+	vehicleID, _ := strconv.Atoi(c.FormValue("vehicle_id"),)
 
-		report := models.MaintenanceReport{
-			VehicleID:    req.VehicleID,
-			CreatedBy:    user.ID,
-			Odometer:     req.Odometer,
-			Complaint:    req.Complaint,
-			InitialPhoto: req.InitialPhoto,
-			Status:       "PENDING_APPROVAL",
-		}
+	odometer, _ :=strconv.Atoi(c.FormValue("odometer"),)
+	complaint := c.FormValue("complaint")
+	itemsJSON := c.FormValue("items")
 
-		if err := tx.Create(&report).Error; err != nil {
-			return err
-		}
+	type RequestItem struct {
+		ItemID  uint `json:"item_id"`
+		Quantity int `json:"quantity"`
+	}
 
-		for _, item := range req.Items {
+	var items []RequestItem
 
-			var masterItem models.MasterItem
-
-			if err := tx.First(&masterItem, item.ItemID).Error; err != nil {
-				return err
-			}
-
-			reportItem := models.ReportItem{
-				ReportID:      report.ID,
-				ItemID:        item.ItemID,
-				Quantity:      item.Quantity,
-				PriceSnapshot: masterItem.Price,
-			}
-
-			if err := tx.Create(&reportItem).Error; err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+	err := json.Unmarshal(
+		[]byte(itemsJSON),
+		&items,
+	)
 
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{
-			"message": err.Error(),
-		})
+
+		return c.Status(400).JSON(
+			fiber.Map{
+				"message": "Invalid items",
+			},
+		)
+	}
+
+	photo, err := c.FormFile("photo")
+
+	if err != nil {
+
+		return c.Status(400).JSON(
+			fiber.Map{
+				"message": "Photo required",
+			},
+		)
+	}
+
+	// create folder
+	if err := os.MkdirAll(
+		"./uploads/initial_photos",
+		os.ModePerm,
+	); err != nil {
+
+		return c.Status(500).JSON(
+			fiber.Map{
+				"message": err.Error(),
+			},
+		)
+	}
+
+	// unique filename
+	filename := fmt.Sprintf(
+		"%d_%s",
+		time.Now().Unix(),
+		photo.Filename,
+	)
+
+	savePath := "./uploads/initial_photos/" + filename
+
+	// save file
+	if err := c.SaveFile(photo, savePath); err != nil {
+
+		return c.Status(500).JSON(
+			fiber.Map{
+				"message": err.Error(),
+			},
+		)
+	}
+
+	var report models.MaintenanceReport
+
+	err = config.DB.Transaction(
+		func(tx *gorm.DB) error {
+
+			report = models.MaintenanceReport{
+				VehicleID: uint(vehicleID),
+				CreatedBy: user.ID,
+				Odometer:  odometer,
+				Complaint: complaint,
+
+				InitialPhoto: "uploads/initial_photos/" + filename,
+
+				Status:
+					"PENDING_APPROVAL",
+			}
+
+			if err := tx.Create(&report).Error; err != nil {
+				return err
+			}
+
+			for _, item := range items {
+
+				var masterItem models.MasterItem
+
+				if err := tx.First(
+					&masterItem,
+					item.ItemID,
+				).Error; err != nil {
+
+					return err
+				}
+
+				reportItem :=
+					models.ReportItem{
+						ReportID: report.ID,
+
+						ItemID: item.ItemID,
+
+						Quantity: item.Quantity,
+
+						PriceSnapshot:
+							masterItem.Price,
+					}
+
+				if err := tx.Create(
+					&reportItem,
+				).Error; err != nil {
+
+					return err
+				}
+			}
+
+			return nil
+		},
+	)
+
+	if err != nil {
+		// hapus uploaded file jika gagal transaction
+		if report.InitialPhoto != "" {
+
+			filePath := "./" + report.InitialPhoto
+
+			if _, statErr := os.Stat(filePath); statErr == nil {
+
+				removeErr := os.Remove(filePath)
+
+				if removeErr != nil {
+					log.Println(
+						"failed remove file:",
+						removeErr,
+					)
+				}
+			}
+		}
+
+		return c.Status(500).JSON(
+			fiber.Map{
+				"message": err.Error(),
+			},
+		)
 	}
 
 	go services.SendWebhook(
 		"report.created",
-		req,
+		report,
 	)
 
 	return c.JSON(fiber.Map{
@@ -109,42 +217,88 @@ func ApproveReport(c *fiber.Ctx) error {
 	})
 }
 
-type CompleteReportRequest struct {
-	ProofPhoto string `json:"proof_photo"`
-}
-
 func CompleteReport(c *fiber.Ctx) error {
 
 	id := c.Params("id")
-
-	var req CompleteReportRequest
-
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{
-			"message": "Invalid request",
-		})
-	}
 
 	var report models.MaintenanceReport
 
 	err := config.DB.First(&report, id).Error
 
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{
-			"message": "Report not found",
-		})
+
+		return c.Status(404).JSON(
+			fiber.Map{
+				"message": "Report not found",
+			},
+		)
 	}
 
 	if report.Status != "APPROVED" {
-		return c.Status(400).JSON(fiber.Map{
-			"message": "Report must be approved first",
-		})
+
+		return c.Status(400).JSON(
+			fiber.Map{
+				"message": "Report must be approved first",
+			},
+		)
 	}
 
-	report.Status = "COMPLETED"
-	report.ProofPhoto = req.ProofPhoto
+	photo, err := c.FormFile("proof_photo")
 
-	config.DB.Save(&report)
+	if err != nil {
+
+		return c.Status(400).JSON(
+			fiber.Map{
+				"message": "Photo required",
+			},
+		)
+	}
+
+	// create folder
+	if err := os.MkdirAll(
+		"./uploads/proof_photos",
+		os.ModePerm,
+	); err != nil {
+
+		return c.Status(500).JSON(
+			fiber.Map{
+				"message": err.Error(),
+			},
+		)
+	}
+
+	filename := fmt.Sprintf(
+		"%d_%s",
+		time.Now().Unix(),
+		photo.Filename,
+	)
+
+	savePath := "./uploads/proof_photos/" + filename
+
+	// save file
+	if err := c.SaveFile(photo, savePath,); err != nil {
+
+		return c.Status(500).JSON(
+			fiber.Map{
+				"message": err.Error(),
+			},
+		)
+	}
+	report.Status = "COMPLETED"
+
+	report.ProofPhoto = "uploads/proof_photos/" + filename
+
+	if err := config.DB.Save(&report,).Error; err != nil {
+
+		// cleanup file
+		os.Remove(savePath)
+
+		return c.Status(500).JSON(
+			fiber.Map{
+				"message": err.Error(),
+			},
+		)
+	}
 
 	go services.SendWebhook(
 		"report.completed",

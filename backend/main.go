@@ -33,6 +33,7 @@ func main() {
 		})
 	})
 	app.Use(cors.New())
+	app.Static("/uploads", "./uploads")
 	routes.SetupRoutes(app)
 
 	log.Fatal(app.Listen(":8080"))

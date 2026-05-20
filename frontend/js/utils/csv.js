@@ -40,8 +40,8 @@ function exportCSV(reports) {
             `"${report.User.Username} [${report.User.Role}]",` +
             `"${report.Status}",` +
             `"${complaint}",` +
-            `"${initialPhoto}",` +
-            `"${proofPhoto}",` +
+            `"${window.APP_CONFIG.API_BASE_URL}/${initialPhoto}",` +
+            `"${window.APP_CONFIG.API_BASE_URL}/${proofPhoto}",` +
             `"${items}"\n`;
     });
 
