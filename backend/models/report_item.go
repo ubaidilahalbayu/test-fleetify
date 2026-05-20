@@ -8,5 +8,4 @@ type ReportItem struct {
 	PriceSnapshot float64
 
 	Item   MasterItem       `gorm:"foreignKey:ItemID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
-	Report MaintenanceReport `gorm:"foreignKey:ReportID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 }

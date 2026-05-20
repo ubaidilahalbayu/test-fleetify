@@ -15,4 +15,6 @@ type MaintenanceReport struct {
 
 	Vehicle Vehicle `gorm:"foreignKey:VehicleID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
 	User    User    `gorm:"foreignKey:CreatedBy;constraint:OnUpdate:CASCADE,OnDelete:CASCADE"`
+
+	Items []ReportItem `gorm:"foreignKey:ReportID"`
 }

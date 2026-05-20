@@ -147,6 +147,8 @@ func GetReports(c *fiber.Ctx) error {
 	config.DB.
 		Preload("Vehicle").
 		Preload("User").
+		Preload("Items").
+		Preload("Items.Item").
 		Order("created_at desc").
 		Find(&reports)
 
