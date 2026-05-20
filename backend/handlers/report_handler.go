@@ -3,6 +3,7 @@ package handlers
 import (
 	"fleetify-backend/config"
 	"fleetify-backend/models"
+	"fleetify-backend/services"
 
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -64,6 +65,11 @@ func CreateReport(c *fiber.Ctx) error {
 		})
 	}
 
+	go services.SendWebhook(
+		"report.created",
+		req,
+	)
+
 	return c.JSON(fiber.Map{
 		"message": "Report created successfully",
 	})
@@ -92,6 +98,11 @@ func ApproveReport(c *fiber.Ctx) error {
 	report.Status = "APPROVED"
 
 	config.DB.Save(&report)
+
+	go services.SendWebhook(
+		"report.approved",
+		report,
+	)
 
 	return c.JSON(fiber.Map{
 		"message": "Report approved",
@@ -134,6 +145,11 @@ func CompleteReport(c *fiber.Ctx) error {
 	report.ProofPhoto = req.ProofPhoto
 
 	config.DB.Save(&report)
+
+	go services.SendWebhook(
+		"report.completed",
+		report,
+	)
 
 	return c.JSON(fiber.Map{
 		"message": "Report completed",
